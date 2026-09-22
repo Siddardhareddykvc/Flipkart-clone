@@ -1,40 +1,71 @@
 name: deployment
-on: workflow_dispatch
+
+on:
+  workflow_dispatch:
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
 
-    - name: az login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # 1. Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: latest
+      # 2. Setup Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
 
-    - name: Terraform init
-      working-directory: ./terraform
-      run: terraform init -upgrade
+      # 3. Check Terraform installation
+      - name: Check Terraform
+        run: terraform version
 
-    - name: Terraform apply
-      working-directory: ./terraform
-      run: terraform apply -auto-approve
+      # 4. Azure login
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: setup dotnet
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '8.0.x'
-    
-    - name: Publish app
-      run: dotnet publish Flipkart-clone.csproj -c Release -o ./publish
+      # 5. Terraform Init
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init -upgrade
 
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: flipkart-webapp-demo
-        package: ./publish
+      # 6. Terraform Validate
+      - name: Terraform Validate
+        working-directory: ./terraform
+        run: terraform validate
+
+      # 7. Terraform Plan
+      - name: Terraform Plan
+        working-directory: ./terraform
+        run: terraform plan
+
+      # 8. Terraform Apply
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: terraform apply -auto-approve
+
+      # 9. Setup .NET 8
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # 10. Restore dependencies
+      - name: Restore
+        run: dotnet restore Flipkart-clone.csproj
+
+      # 11. Publish application
+      - name: Publish app
+        run: dotnet publish Flipkart-clone.csproj -c Release -o ./publish
+
+      # 12. Deploy application
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: flipkart-webapp-demo
+          package: ./publish
